@@ -128,12 +128,38 @@ class NeedlemanWunsch:
         
         # TODO: Initialize matrix private attributes for use in alignment
         # create matrices for alignment scores, gaps, and backtracing
-        pass
+       
+        lenA, lenB = len(seqA), len(seqB)
+        self._align_matrix = np.zeros((lenA + 1, lenB + 1))
+        self._back = np.zeros((lenA + 1, lenB + 1), dtype=int)
 
-        
+        # Gap penalties
+        for i in range(1, lenA + 1):
+            self._align_matrix[i][0] = self.gap_open + (i - 1) * self.gap_extend
+            self._back[i][0] = 1  # Indicates move from above
+        for j in range(1, lenB + 1):
+            self._align_matrix[0][j] = self.gap_open + (j - 1) * self.gap_extend
+            self._back[0][j] = 2  # Indicates move from left
+
         # TODO: Implement global alignment here
-        pass      		
-        		    
+        for i in range(1, lenA + 1):
+            for j in range(1, lenB + 1):
+                match_score = self.sub_dict.get((seqA[i-1], seqB[j-1]), -1)
+                diagonal = self._align_matrix[i-1][j-1] + match_score
+                up = self._align_matrix[i-1][j] + self.gap_extend
+                left = self._align_matrix[i][j-1] + self.gap_extend
+
+                best_score = max(diagonal, up, left)
+                self._align_matrix[i][j] = best_score
+                
+                # Store backtrace direction
+                if best_score == diagonal:
+                    self._back[i][j] = 0  # Diagonal move (match/mismatch)
+                elif best_score == up:
+                    self._back[i][j] = 1  # Move from above (gap in B)
+                else:
+                    self._back[i][j] = 2  # Move from left (gap in A)
+      		        		    
         return self._backtrace()
 
     def _backtrace(self) -> Tuple[float, str, str]:
@@ -150,7 +176,28 @@ class NeedlemanWunsch:
          	(alignment score, seqA alignment, seqB alignment) : Tuple[float, str, str]
          		the score and corresponding strings for the alignment of seqA and seqB
         """
-        pass
+        i, j = len(self._seqA), len(self._seqB)
+        aligned_A, aligned_B = [], []
+        
+        # Follow backtrace matrix to build aligned sequences
+        while i > 0 or j > 0:
+            if i > 0 and j > 0 and self._back[i][j] == 0:
+                aligned_A.append(self._seqA[i-1])
+                aligned_B.append(self._seqB[j-1])
+                i -= 1
+                j -= 1
+            elif i > 0 and self._back[i][j] == 1:
+                aligned_A.append(self._seqA[i-1])
+                aligned_B.append('-')
+                i -= 1
+            else:
+                aligned_A.append('-')
+                aligned_B.append(self._seqB[j-1])
+                j -= 1
+        
+        self.seqA_align = ''.join(reversed(aligned_A))
+        self.seqB_align = ''.join(reversed(aligned_B))
+        self.alignment_score = self._align_matrix[-1][-1]
 
         return (self.alignment_score, self.seqA_align, self.seqB_align)
 
